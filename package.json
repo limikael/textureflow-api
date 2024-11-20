@@ -1,0 +1,22 @@
+{
+  "name": "textureflow-api",
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "jasmine"
+  },
+  "dependencies": {
+    "path-browserify": "^1.0.1",
+    "qql": "^1.0.18",
+    "three": "^0.170.0",
+    "url-join": "^5.0.0"
+  },
+  "devDependencies": {
+    "jasmine": "^5.4.0",
+    "xmldom": "^0.6.0"
+  },
+  "exports": {
+    ".": "./src/lib/exports.js"
+  }
+}
