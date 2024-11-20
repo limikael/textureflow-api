@@ -1,7 +1,7 @@
 import {ColladaLoader} from 'three/addons/loaders/ColladaLoader.js';
 import {loaderPromise, loaderParsePromise, threeUniqueMaterials} from "../utils/three-util.js";
 import * as THREE from 'three';
-import {treeForEach, treeNodeByIndexPath, treeSplitIndexPath, treeLeafIndexPaths} from "../utils/tree-util.js";
+import {treeForEach, treeNodeByIndexPath, treeSplitIndexPath, treeLeafIndexPaths, treePathBasename, treePathDirname} from "../utils/tree-util.js";
 import urlJoin from "url-join";
 import {MaterialLibrary} from "./MaterialLibrary.js";
 import {createNodeInfo} from "./textureflow-util.js";
@@ -52,8 +52,12 @@ export class TextureflowModel extends EventTarget {
 			index++;
 		}
 
+		console.log("num face paths: "+this.getFacePaths().length);
+
 		for (let facePath of this.getFacePaths())
 			this.initFaceInfo(facePath,labelByMaterial);
+
+		//throw new Error("wip");
 
 		this.setLoadingState(false);
 	}
@@ -188,24 +192,77 @@ export class TextureflowModel extends EventTarget {
 		let res=[];
 		let parent=treeNodeByIndexPath(this.model,indexPath);
 		treeForEach(parent,(threeNode,nodeIndexPath)=>{
-			if (threeNode.type=="Mesh" && !threeNode.children.length)
-				res.push([...indexPath,...nodeIndexPath].join("/"))
+			if (threeNode.type=="Mesh") {
+				if (threeNode.children.length)
+					throw new Error("A mesh with children?");
 
-			// todo: handle multi material
+				if (Array.isArray(threeNode.material)) {
+					for (let mi=0; mi<threeNode.material.length; mi++)
+						res.push([...indexPath,...nodeIndexPath,mi].join("/"))
+				}
+
+				else {
+					res.push([...indexPath,...nodeIndexPath].join("/"))
+				}
+			}
 		});
 
 		return res;
 	}
 
+	getMeshFacePath(facePath) {
+		let parentPath=treePathDirname(facePath);
+		let parentNode=treeNodeByIndexPath(this.model,parentPath);
+
+		if (parentNode.type=="Mesh")
+			return parentPath;
+
+		return facePath;
+	}
+
+	getModelFaceMaterial(facePath) {
+		let meshFacePath=this.getMeshFacePath(facePath);
+
+		if (meshFacePath==facePath) {
+			let node=treeNodeByIndexPath(this.model,facePath);
+			return node.material;
+		}
+
+		let parentNode=treeNodeByIndexPath(this.model,meshFacePath);
+		let materialIndex=treePathBasename(facePath);
+
+		return parentNode.material[materialIndex];
+	}
+
 	getFaceInfo(facePath) {
-		let node=treeNodeByIndexPath(this.model,facePath);
-		if (node.type!="Mesh")
-			throw new Error("Should be a mesh");
+		let meshFacePath=this.getMeshFacePath(facePath);
 
-		if (!node.userData.faceInfo)
-			node.userData.faceInfo={};
+		if (meshFacePath==facePath) {
+			let node=treeNodeByIndexPath(this.model,facePath);
+			if (node.type!="Mesh")
+				throw new Error("Should be a mesh");
 
-		return node.userData.faceInfo;
+			if (!node.userData.faceInfo)
+				node.userData.faceInfo={};
+
+			return node.userData.faceInfo;
+		}
+
+		else {
+			let parentNode=treeNodeByIndexPath(this.model,meshFacePath);
+			if (parentNode.type!="Mesh")
+				throw new Error("parent is not mesh");
+
+			let materialIndex=treePathBasename(facePath);
+
+			if (!parentNode.userData.faceInfo)
+				parentNode.userData.faceInfo=[];
+
+			if (!parentNode.userData.faceInfo[materialIndex])
+				parentNode.userData.faceInfo[materialIndex]={};
+
+			return parentNode.userData.faceInfo[materialIndex];
+		}
 	}
 
 	updateFaceInfo(facePath, newFaceInfo) {
@@ -228,17 +285,16 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	initFaceInfo(facePath, labelByMaterial) {
+		//console.log("init face info: "+facePath);
+
 		let faceInfo=this.getFaceInfo(facePath);
-		let threeNode=treeNodeByIndexPath(this.model,facePath);
+		let material=this.getModelFaceMaterial(facePath);
 
-		if (Array.isArray(threeNode.material))
-			throw new Error("not yet face group");
-
-		faceInfo.color=threeNode.material.color;
+		faceInfo.color=material.color;
 		faceInfo.labels=[];
 
-		if (threeNode.material)
-			faceInfo.labels.push(labelByMaterial.get(threeNode.material));
+		if (material)
+			faceInfo.labels.push(labelByMaterial.get(material));
 	}
 
 	updateFaceData(facePath) {

@@ -1,5 +1,17 @@
 import {objectifyArgs} from "./js-util.js";
 
+export function treePathBasename(pathname) {
+	let split=treeSplitIndexPath(pathname);
+
+	return split[split.length-1];
+}
+
+export function treePathDirname(pathname) {
+	let split=treeSplitIndexPath(pathname);
+
+	return split.slice(0,split.length-1).join("/");
+}
+
 export function treeSplitIndexPath(pathname) {
 	if (Array.isArray(pathname))
 		return pathname;

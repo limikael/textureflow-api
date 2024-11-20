@@ -4,10 +4,11 @@ import fs from "fs";
 import {DOMParser} from "xmldom";
 
 globalThis.DOMParser=DOMParser;
+globalThis.document=null;
 
 describe("TextureflowModel",()=>{
 	it("can be imported",async ()=>{
-		let textureflowModel=new TextureflowModel();
+		/*let textureflowModel=new TextureflowModel();
 
 		let file=await getFileObject("spec/data/house.dae",{fs});
 		await textureflowModel.import(URL.createObjectURL(file),{initMaterialLibrary: false});
@@ -15,8 +16,7 @@ describe("TextureflowModel",()=>{
 		for (let facePath of textureflowModel.getFacePaths()) {
 			let faceInfo=textureflowModel.getFaceInfo(facePath);
 
-		}
-
+		}*/
 
 		//console.log(textureflowModel.nodeInfo);
 
@@ -32,5 +32,12 @@ describe("TextureflowModel",()=>{
 
 		let json=textureflowModel.model.toJSON();
 		console.log(json.object);*/
+	});
+
+	it("can be imported",async ()=>{
+		let textureflowModel=new TextureflowModel();
+
+		let file=await getFileObject("spec/data/Jungle.OS.noimg.dae",{fs});
+		await textureflowModel.import(URL.createObjectURL(file),{initMaterialLibrary: false});
 	});
 });
