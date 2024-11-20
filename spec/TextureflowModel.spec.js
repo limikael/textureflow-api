@@ -12,6 +12,12 @@ describe("TextureflowModel",()=>{
 		let file=await getFileObject("spec/data/house.dae",{fs});
 		await textureflowModel.import(URL.createObjectURL(file),{initMaterialLibrary: false});
 
+		for (let facePath of textureflowModel.getFacePaths()) {
+			let faceInfo=textureflowModel.getFaceInfo(facePath);
+
+		}
+
+
 		//console.log(textureflowModel.nodeInfo);
 
 		//console.log(textureflowModel.getNodeInfo("0"));
@@ -22,9 +28,9 @@ describe("TextureflowModel",()=>{
 		let nodePaths=textureflowModel.getNodePathsByLabel(labels[0]);
 		console.log(nodePaths);*/
 
-		textureflowModel.model.userData={hello: "world"};
+		/*textureflowModel.model.userData={hello: "world"};
 
 		let json=textureflowModel.model.toJSON();
-		console.log(json.object);
+		console.log(json.object);*/
 	});
 });

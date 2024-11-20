@@ -11,17 +11,20 @@ import UvUnwrap from "../utils/UvUnwrap.js";
 export class TextureflowModel extends EventTarget {
 	constructor() {
 		super();
-		//this.url=url;
+
 		this.materialLibrary=new MaterialLibrary();
 		this.materialLibrary.addEventListener("materialLoaded",this.handleMaterialLoaded);
 		this.hidden=[];
-		//this.nodeInfoMaterials={};
 
 		this.loadingMaterial=new THREE.MeshBasicMaterial({color: 0xff0000});
 
 		this.invisibleMaterial=new THREE.MeshBasicMaterial({color: 0xffffff});
 		this.invisibleMaterial.transparent=true;
 		this.invisibleMaterial.opacity=0;
+
+		this.selectionMaterial=new THREE.MeshBasicMaterial({color: 0x4093ea});
+		this.selectionMaterial.transparent=true;
+		this.selectionMaterial.opacity=0.5;
 	}
 
 	async import(url, options={}) {
@@ -49,30 +52,45 @@ export class TextureflowModel extends EventTarget {
 			index++;
 		}
 
-		this.nodeInfo=createNodeInfo(this.model,[],labelByMaterial);
-		this.nodeData={};
+		for (let facePath of this.getFacePaths())
+			this.initFaceInfo(facePath,labelByMaterial);
 
 		this.setLoadingState(false);
 	}
 
-	async parse(project) {
+	async parse(modelData, options={}) {
 		this.setLoadingState(true);
 
-		await this.materialLibrary.init();
+		if (options.initMaterialLibrary===undefined)
+			options.initMaterialLibrary=true;
+
+		if (options.initMaterialLibrary)
+			await this.materialLibrary.init();
 
 		let loader=new THREE.ObjectLoader();
-		this.model=await loaderParsePromise(loader,project.model);
+		this.model=await loaderParsePromise(loader,modelData);
 
 		this.box=new THREE.Box3();
 		this.box.expandByObject(this.model);
 
-		this.nodeInfo=project.nodeInfo;
-		this.nodeData={};
-
-		for (let nodePath of this.getLeafNodePaths())
-			this.updateNode(nodePath);
+		for (let facePath of this.getFacePaths())
+			this.updateFace(facePath);
 
 		this.setLoadingState(false);
+	}
+
+	getModelExportData() {
+		let modelClone=this.model.clone();
+
+		treeForEach(modelClone,threeNode=>{
+			if (Array.isArray(threeNode.material))
+				threeNode.material.fill();
+
+			else if (threeNode.material)
+				threeNode.material=undefined;
+		});
+
+		return modelClone;
 	}
 
 	setLoadingState(loadingState) {
@@ -94,210 +112,38 @@ export class TextureflowModel extends EventTarget {
 		return "complete";
 	}
 
-	updateNodeData(nodePath) {
-		if (!this.nodeData[nodePath])
-			this.nodeData[nodePath]={};
-
-		let nodeData=this.nodeData[nodePath];
-		let nodeInfo=treeNodeByIndexPath(this.nodeInfo,nodePath);
-
-		if (!nodeData.textureMaterial) {
-			let texture=new THREE.Texture();
-			texture.wrapS=THREE.RepeatWrapping;
-			texture.wrapT=THREE.RepeatWrapping;
-			texture.repeat.set(1,1);
-
-			nodeData.textureMaterial=new THREE.MeshStandardMaterial( { map:texture } );
-		}
-
-		if (!nodeData.colorMaterial)
-			nodeData.colorMaterial=new THREE.MeshPhongMaterial({color: nodeInfo.color, specular: 0xffffff});
-
-		if (nodeInfo.materialName) {
-			let libraryMaterial=this.materialLibrary.getMaterial(nodeInfo.materialName);
-			if (libraryMaterial.image && 
-					libraryMaterial.image!=nodeData.textureMaterial.map.image) {
-				nodeData.textureMaterial.map.image=libraryMaterial.image;
-				nodeData.textureMaterial.map.needsUpdate=true;
-			}
-		}
-
-		else {
-			if (nodeData.textureMaterial.map.image) {
-				nodeData.textureMaterial.map.image=null;
-				nodeData.textureMaterial.map.needsUpdate=true;
-			}
-		}
-
-		let textureRotation=nodeInfo.textureRotation;
-		if (!textureRotation)
-			textureRotation=0;
-
-		nodeData.textureMaterial.map.rotation=2*Math.PI*textureRotation/360;
-
-		let textureScale=nodeInfo.textureScale;
-		if (!textureScale)
-			textureScale=1;
-
-		nodeData.textureMaterial.map.repeat.set(1/textureScale,1/textureScale);
-	}
-
-	getNodeMaterial(nodePath) {
-		let nodeInfo=treeNodeByIndexPath(this.nodeInfo,nodePath);
-		this.updateNodeData(nodePath);
-		let nodeData=this.nodeData[nodePath];
-
-		if (this.hidden.includes(nodePath))
-			return this.invisibleMaterial;
-
-		if (nodeInfo.materialName) {
-			if (nodeData.textureMaterial.map.image)
-				return nodeData.textureMaterial;
-
-			return this.loadingMaterial;
-		}
-
-		return nodeData.colorMaterial;
-	}
-
-	updateNode(nodePath) {
-		let indexPath=nodePath.split("/");
-		let nodeInfo=treeNodeByIndexPath(this.nodeInfo,indexPath);
-		let threeNode;
-		let material;
-
-		switch (nodeInfo.type) {
-			case "Mesh":
-				threeNode=treeNodeByIndexPath(this.model,indexPath);
-				material=this.getNodeMaterial(nodePath);
-				threeNode.material=material;
-
-				if (material.map &&
-						material.map.image &&
-						!nodeInfo.uvCalculated)
-					this.calculateUvCoords(nodePath);
-				break;
-
-			case "FaceGroup":
-				throw new Error("FaceGroup is wip");
-				/*threeNode=treeNodeByIndexPath(this.model,indexPath.slice(0,indexPath.length-1));
-				let materialIndex=indexPath[indexPath.length-1];
-				if (this.hidden.includes(nodePath)) {
-					threeNode.material[materialIndex]=this.invisibleMaterial;
-				}
-
-				else if (nodeInfo.materialName) {
-					threeNode.material[materialIndex]=this.getNodeInfoMaterial(nodePath);
-				}
-
-				else {
-					threeNode.material[materialIndex]=new THREE.MeshPhongMaterial({color: nodeInfo.color, specular: 0xffffff});
-				}*/
-
-				break;
-		}
-	}
-
 	handleMaterialLoaded=(ev)=>{
-		console.log("handle material loaded: "+ev.materialName);
+		//console.log("handle material loaded: "+ev.materialName);
 
-		treeForEach(this.nodeInfo,(nodeInfo,indexPath)=>{
-			let nodePath=indexPath.join("/");
-			if (nodeInfo.materialName==ev.materialName) {
-				//console.log("refresh after material load: "+materialName+": "+indexPathname);
-				this.updateNode(nodePath);
-			}
-		});
-	}
-
-	setNodeInfo(nodePath, update) {
-		let nodeInfo=this.getNodeInfo(nodePath);
-		Object.assign(nodeInfo,update);
-
-		this.updateNode(nodePath);
-		this.dispatchEvent(new Event("change"));
-		this.dispatchEvent(new Event("modelChange"));
-	}
-
-	getNodeInfo(nodePath) {
-		return treeNodeByIndexPath(this.nodeInfo,nodePath);
-	}
-
-	getLabels() {
-		let labels=[];
-
-		treeForEach(this.nodeInfo,nodeInfo=>{
-			labels.push(...nodeInfo.labels)
-		});
-
-		return arrayUnique(labels);
-	}
-
-	getNodePathsByLabel(label) {
-		let nodePaths=[];
-
-		treeForEach(this.nodeInfo,(nodeInfo,indexPath)=>{
-			if (nodeInfo.labels.includes(label))
-				nodePaths.push(indexPath.join("/"));
-		});
-
-		return nodePaths;
-	}
-
-	getLeafNodePaths(parentNodePath) {
-		let indexPath=treeSplitIndexPath(parentNodePath);
-		let res=[];
-		let parent=treeNodeByIndexPath(this.nodeInfo,indexPath);
-		treeForEach(parent,(infoNode,nodeIndexPath)=>{
-			if (!infoNode.children || !infoNode.children.length)
-				res.push([...indexPath,...nodeIndexPath].join("/"))
-		});
-
-		return res;
+		for (let facePath of this.getFacePaths()) {
+			let faceInfo=this.getFaceInfo(facePath);
+			if (faceInfo.materialName==ev.materialName)
+				this.updateFace(facePath);
+		}
 	}
 
 	createNodeSelectionClone(node, faceGroupIndex) {
-		let m=new THREE.MeshBasicMaterial({color: 0x4093ea});
-		m.transparent=true;
-		m.opacity=0.5;
-
 		let cloneNode=node.clone();
 
 		if (Array.isArray(cloneNode.material)) {
 			cloneNode.material.fill(this.invisibleMaterial);
-			cloneNode.material[faceGroupIndex]=m;
+			cloneNode.material[faceGroupIndex]=this.selectionMaterial;
 		}
 
 		else {
-			cloneNode.material=m;
+			cloneNode.material=this.selectionMaterial;
 		}
 
 		return cloneNode;
 	}
 
-	getModelExportData() {
-		let modelClone=this.model.clone();
-
-		treeForEach(modelClone,threeNode=>{
-			if (Array.isArray(threeNode.material))
-				threeNode.material.fill();
-
-			else if (threeNode.material)
-				threeNode.material=undefined;
-		});
-
-		return modelClone;
-	}
-
 	createSelectionClone(selectionNodePaths) {
 		let selectionClone=new THREE.Group();
 		treeForEach(this.model,(node,indexPath)=>{
-			//let indexPath=threeIndexPath(this.model,node);
-			let nodePath=indexPath.join("/");
-			//let indexPathname=indexPath.join("/");
-
 			if (node.type!="Mesh")
 				return;
+
+			let nodePath=indexPath.join("/");
 
 			if (Array.isArray(node.material)) {
 				for (let i=0; i<node.material.length; i++) {
@@ -320,7 +166,160 @@ export class TextureflowModel extends EventTarget {
 		return selectionClone;
 	}
 
+	getLabels() {
+		let labels=[];
+		for (let facePath of this.getFacePaths())
+			labels.push(...this.getFaceInfo(facePath).labels);
+
+		return arrayUnique(labels);
+	}
+
+	getFacePathsByLabel(label) {
+		let facePaths=[];
+		for (let facePath of this.getFacePaths())
+			if (this.getFaceInfo(facePath).labels.includes(label))
+				facePaths.push(facePath);
+
+		return facePaths;
+	}
+
+	getFacePaths(parentNodePath) {
+		let indexPath=treeSplitIndexPath(parentNodePath);
+		let res=[];
+		let parent=treeNodeByIndexPath(this.model,indexPath);
+		treeForEach(parent,(threeNode,nodeIndexPath)=>{
+			if (threeNode.type=="Mesh" && !threeNode.children.length)
+				res.push([...indexPath,...nodeIndexPath].join("/"))
+
+			// todo: handle multi material
+		});
+
+		return res;
+	}
+
+	getFaceInfo(facePath) {
+		let node=treeNodeByIndexPath(this.model,facePath);
+		if (node.type!="Mesh")
+			throw new Error("Should be a mesh");
+
+		if (!node.userData.faceInfo)
+			node.userData.faceInfo={};
+
+		return node.userData.faceInfo;
+	}
+
+	updateFaceInfo(facePath, newFaceInfo) {
+		let faceInfo=this.getFaceInfo(facePath);
+		Object.assign(faceInfo,newFaceInfo);
+		this.updateFace(facePath);
+		this.dispatchEvent(new Event("change"));
+		this.dispatchEvent(new Event("modelChange"));
+	}
+
+	getFaceData(facePath) {
+		let node=treeNodeByIndexPath(this.model,facePath);
+		if (node.type!="Mesh")
+			throw new Error("Should be a mesh");
+
+		if (!node.faceData)
+			node.faceData={};
+
+		return node.faceData;
+	}
+
+	initFaceInfo(facePath, labelByMaterial) {
+		let faceInfo=this.getFaceInfo(facePath);
+		let threeNode=treeNodeByIndexPath(this.model,facePath);
+
+		if (Array.isArray(threeNode.material))
+			throw new Error("not yet face group");
+
+		faceInfo.color=threeNode.material.color;
+		faceInfo.labels=[];
+
+		if (threeNode.material)
+			faceInfo.labels.push(labelByMaterial.get(threeNode.material));
+	}
+
+	updateFaceData(facePath) {
+		let faceData=this.getFaceData(facePath);
+		let faceInfo=this.getFaceInfo(facePath);
+
+		if (!faceData.textureMaterial) {
+			let texture=new THREE.Texture();
+			texture.wrapS=THREE.RepeatWrapping;
+			texture.wrapT=THREE.RepeatWrapping;
+			texture.repeat.set(1,1);
+
+			faceData.textureMaterial=new THREE.MeshStandardMaterial( { map:texture } );
+		}
+
+		if (!faceData.colorMaterial)
+			faceData.colorMaterial=new THREE.MeshPhongMaterial({color: faceInfo.color, specular: 0xffffff});
+
+		if (faceInfo.materialName) {
+			let libraryMaterial=this.materialLibrary.getMaterial(faceInfo.materialName);
+			if (libraryMaterial.image && 
+					libraryMaterial.image!=faceData.textureMaterial.map.image) {
+				faceData.textureMaterial.map.image=libraryMaterial.image;
+				faceData.textureMaterial.map.needsUpdate=true;
+			}
+		}
+
+		else {
+			if (faceData.textureMaterial.map.image) {
+				faceData.textureMaterial.map.image=null;
+				faceData.textureMaterial.map.needsUpdate=true;
+			}
+		}
+
+		let textureRotation=faceInfo.textureRotation;
+		if (!textureRotation)
+			textureRotation=0;
+
+		faceData.textureMaterial.map.rotation=2*Math.PI*textureRotation/360;
+
+		let textureScale=faceInfo.textureScale;
+		if (!textureScale)
+			textureScale=1;
+
+		faceData.textureMaterial.map.repeat.set(1/textureScale,1/textureScale);
+	}
+
+	getFaceMaterial(facePath) {
+		let faceInfo=this.getFaceInfo(facePath);
+		let faceData=this.getFaceData(facePath);
+
+		if (this.hidden.includes(facePath))
+			return this.invisibleMaterial;
+
+		if (faceInfo.materialName) {
+			if (faceData.textureMaterial.map.image)
+				return faceData.textureMaterial;
+
+			return this.loadingMaterial;
+		}
+
+		return faceData.colorMaterial;
+	}
+
+	updateFace(facePath) {
+		this.updateFaceData(facePath);
+
+		let threeNode=treeNodeByIndexPath(this.model,facePath);
+		if (threeNode.type!="Mesh")
+			throw new Error("Expected mesh");
+
+		let faceInfo=this.getFaceInfo(facePath);
+		if (faceInfo.materialName && !faceInfo.uvCalculated)
+			this.calculateUvCoords(facePath);
+
+		threeNode.material=this.getFaceMaterial(facePath);
+	}
+
 	calculateUvCoords(nodePath) {
+		console.log("compute: "+nodePath);
+
 		let node=treeNodeByIndexPath(this.model,nodePath);
 		if (node.type!="Mesh")
 			throw new Error("Not a mesh!");
@@ -339,14 +338,14 @@ export class TextureflowModel extends EventTarget {
 		let uvAttribute=new THREE.BufferAttribute(uvArray,2);
 		node.geometry.setAttribute("uv",uvAttribute);
 
-		let nodeInfo=this.getNodeInfo(nodePath);
-		nodeInfo.uvCalculated=true;
+		let faceInfo=this.getFaceInfo(nodePath);
+		faceInfo.uvCalculated=true;
 	}
 
 	setHidden(hidden) {
 		this.hidden=hidden;
-		for (let nodePath of this.getLeafNodePaths())
-			this.updateNode(nodePath);
+		for (let facePath of this.getFacePaths())
+			this.updateFace(facePath);
 
 		this.dispatchEvent(new Event("change"));
 	}
