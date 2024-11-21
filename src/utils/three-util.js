@@ -51,3 +51,22 @@ export function threeUniqueMaterials(model) {
 
 	return uniqueMaterials;
 }
+
+export function threeCanonicalizeMultiMaterial(model) {
+	if (model.material && !Array.isArray(model.material))
+		model.material=[model.material];
+
+	for (let child of model.children)
+		threeCanonicalizeMultiMaterial(child);
+}
+
+export function threeNameNodes(node, index) {
+	if (index===undefined)
+		index=0;
+
+	if (!node.name)
+		node.name=node.type+" "+(index+1);
+
+	for (let i=0; i<node.children.length; i++)
+		threeNameNodes(node.children[i],i);
+}

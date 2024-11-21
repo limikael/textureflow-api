@@ -36,3 +36,11 @@ export function arrayUnique(a) {
 
     return a.filter(onlyUnique);
 }
+
+export function arrayIncludesAll(a, cands) {
+    for (let cand of cands)
+        if (!a.includes(cand))
+            return false;
+
+    return true;
+}

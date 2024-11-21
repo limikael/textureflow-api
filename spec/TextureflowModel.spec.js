@@ -2,36 +2,22 @@ import {TextureflowModel} from "../src/textureflow/TextureflowModel.js";
 import {getFileObject} from "../src/utils/fs-util.js";
 import fs from "fs";
 import {DOMParser} from "xmldom";
+import {treeForEach} from "../src/utils/tree-util.js";
 
 globalThis.DOMParser=DOMParser;
-globalThis.document=null;
 
 describe("TextureflowModel",()=>{
 	it("can be imported",async ()=>{
-		/*let textureflowModel=new TextureflowModel();
+		let textureflowModel=new TextureflowModel();
 
 		let file=await getFileObject("spec/data/house.dae",{fs});
 		await textureflowModel.import(URL.createObjectURL(file),{initMaterialLibrary: false});
 
-		for (let facePath of textureflowModel.getFacePaths()) {
-			let faceInfo=textureflowModel.getFaceInfo(facePath);
+		//console.log(textureflowModel.getFacePaths("0/0"));
 
-		}*/
-
-		//console.log(textureflowModel.nodeInfo);
-
-		//console.log(textureflowModel.getNodeInfo("0"));
-
-		/*let labels=textureflowModel.getLabels();
-		console.log(labels);
-
-		let nodePaths=textureflowModel.getNodePathsByLabel(labels[0]);
-		console.log(nodePaths);*/
-
-		/*textureflowModel.model.userData={hello: "world"};
-
-		let json=textureflowModel.model.toJSON();
-		console.log(json.object);*/
+		/*let [node,index]=textureflowModel.resolveFacePath("0/0");
+		console.log(node);
+		console.log(index);*/
 	});
 
 	it("can be imported",async ()=>{
@@ -39,5 +25,11 @@ describe("TextureflowModel",()=>{
 
 		let file=await getFileObject("spec/data/Jungle.OS.noimg.dae",{fs});
 		await textureflowModel.import(URL.createObjectURL(file),{initMaterialLibrary: false});
+
+		treeForEach(textureflowModel.model,(node,indexPath)=>{
+			console.log(indexPath.join("/")+": "+node.name);
+		})
+
+		//console.log("name: "+textureflowModel.model.name);
 	});
 });

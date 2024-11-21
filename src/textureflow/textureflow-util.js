@@ -1,4 +1,4 @@
-export function createNodeInfo(threeNode, indexPath, labelByMaterial) {
+/*export function createNodeInfo(threeNode, indexPath, labelByMaterial) {
 	let infoNode={
 		type: threeNode.type,
 		labels: []
@@ -32,4 +32,4 @@ export function createNodeInfo(threeNode, indexPath, labelByMaterial) {
 	}
 
 	return infoNode;
-}
+}*/
