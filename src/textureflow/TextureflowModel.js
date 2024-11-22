@@ -1,5 +1,7 @@
 import {ColladaLoader} from 'three/addons/loaders/ColladaLoader.js';
-import {loaderPromise, loaderParsePromise, threeUniqueMaterials, threeCanonicalizeMultiMaterial, threeNameNodes} from "../utils/three-util.js";
+import {loaderPromise, loaderParsePromise, threeUniqueMaterials, 
+	threeCanonicalizeMultiMaterial, threeNameNodes, 
+	threeExtractModelUserData, threeApplyModelUserData, threeNameMaterials} from "../utils/three-util.js";
 import * as THREE from 'three';
 import {treeForEach, treeNodeByIndexPath, treeSplitIndexPath, treeLeafIndexPaths, /*treePathBasename, treePathDirname*/} from "../utils/tree-util.js";
 import urlJoin from "url-join";
@@ -15,7 +17,7 @@ export class TextureflowModel extends EventTarget {
 		this.materialLibrary.addEventListener("materialLoaded",this.handleMaterialLoaded);
 		this.hidden=[];
 
-		this.loadingMaterial=new THREE.MeshBasicMaterial({color: 0xff0000});
+		this.loadingMaterial=new THREE.MeshBasicMaterial({color: 0x808080});
 
 		this.invisibleMaterial=new THREE.MeshBasicMaterial({color: 0xffffff});
 		this.invisibleMaterial.visible=false;
@@ -25,7 +27,7 @@ export class TextureflowModel extends EventTarget {
 		this.selectionMaterial.opacity=0.5;
 	}
 
-	async import(url, options={}) {
+	async load(url, options={}) {
 		this.setLoading(true);
 
 		if (options.initMaterialLibrary===undefined)
@@ -36,65 +38,28 @@ export class TextureflowModel extends EventTarget {
 
 		let loader=new ColladaLoader();
 		let urlText=await (await fetch(url)).text();
+		//console.log(urlText);
 		let modelData=loader.parse(urlText);
 
 		this.model=modelData.scene;
-		threeNameNodes(this.model);
-		threeCanonicalizeMultiMaterial(this.model);
-
 		this.box=new THREE.Box3();
 		this.box.expandByObject(this.model);
 
-		let labelByMaterial=new Map();
-		let index=1;
-		for (let material of threeUniqueMaterials(this.model)) {
-			labelByMaterial.set(material,"Material "+index);
-			index++;
+		threeNameNodes(this.model);
+		threeNameMaterials(this.model);
+		threeCanonicalizeMultiMaterial(this.model);
+		threeApplyModelUserData(this.model,options.userData);
+
+		for (let facePath of this.getFacePaths()) {
+			this.initFaceInfo(facePath);
+			this.updateFace(facePath);
 		}
 
-		for (let facePath of this.getFacePaths())
-			this.initFaceInfo(facePath,labelByMaterial);
-
-		for (let facePath of this.getFacePaths())
-			this.updateFace(facePath);
-
 		this.setLoading(false);
 	}
 
-	async parse(modelData, options={}) {
-		this.setLoading(true);
-
-		if (options.initMaterialLibrary===undefined)
-			options.initMaterialLibrary=true;
-
-		if (options.initMaterialLibrary)
-			await this.materialLibrary.init();
-
-		let loader=new THREE.ObjectLoader();
-		this.model=await loaderParsePromise(loader,modelData);
-
-		this.box=new THREE.Box3();
-		this.box.expandByObject(this.model);
-
-		for (let facePath of this.getFacePaths())
-			this.updateFace(facePath);
-
-		this.setLoading(false);
-	}
-
-	getModelExportData() {
-		let modelClone=this.model.clone();
-		let exportMaterial=new THREE.MeshBasicMaterial();
-
-		treeForEach(modelClone,threeNode=>{
-			if (Array.isArray(threeNode.material))
-				threeNode.material.fill(exportMaterial);
-
-			else if (threeNode.material)
-				threeNode.material=exportMaterial;
-		});
-
-		return modelClone.toJSON();
+	getModelUserData() {
+		return threeExtractModelUserData(this.model);
 	}
 
 	setLoading(loading) {
@@ -117,7 +82,7 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	handleMaterialLoaded=(ev)=>{
-		//console.log("handle material loaded: "+ev.materialName);
+		console.log("handle material loaded: "+ev.materialName);
 
 		for (let facePath of this.getFacePaths()) {
 			let faceInfo=this.getFaceInfo(facePath);
@@ -218,7 +183,7 @@ export class TextureflowModel extends EventTarget {
 		return node.userData.faceInfo[index];
 	}
 
-	initFaceInfo(facePath, labelByMaterial) {
+	initFaceInfo(facePath) {
 		let faceInfo=this.getFaceInfo(facePath);
 		let [node,materialIndex]=this.resolveFacePath(facePath);
 		let material=node.material[materialIndex];
@@ -226,7 +191,7 @@ export class TextureflowModel extends EventTarget {
 			throw new Error("No material!");
 
 		faceInfo.name="FaceGroup "+(materialIndex+1);
-		faceInfo.labels=[labelByMaterial.get(material)];
+		faceInfo.labels=[material.name];
 		faceInfo.color=material.color;
 		faceInfo.opacity=material.opacity;
 		if (faceInfo.opacity===undefined)
@@ -310,25 +275,46 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	updateFace(facePath) {
+		//console.log("update face: "+facePath);
+
 		this.updateFaceData(facePath);
 
 		let [node,index]=this.resolveFacePath(facePath);
 		let faceInfo=this.getFaceInfo(facePath);
 		let faceData=this.getFaceData(facePath);
 
+		this.updateUvCoords(node);
+
 		if (this.hidden.includes(facePath)) {
 			node.material[index]=this.invisibleMaterial;
 		}
 
 		else if (faceInfo.materialName) {
-			if (!node.userData.uvCalculated)
-				this.calculateUvCoords(node);
+			if (faceData.textureMaterial.map.image)
+				node.material[index]=faceData.textureMaterial;
 
-			node.material[index]=faceData.textureMaterial;
+			else
+				node.material[index]=this.loadingMaterial;
 		}
 
 		else {
 			node.material[index]=faceData.colorMaterial;
+		}
+	}
+
+	updateUvCoords(node) {
+		let needUv=false;
+		for (let nodeFaceInfo of node.userData.faceInfo)
+			if (nodeFaceInfo && nodeFaceInfo.materialName)
+				needUv=true;
+
+		if (needUv && !node.uvAssigned) {
+			this.calculateUvCoords(node);
+		}
+
+		if (!needUv) {
+			delete node.userData.uvCoords;
+			node.uvAssigned=false;
 		}
 	}
 
@@ -343,14 +329,18 @@ export class TextureflowModel extends EventTarget {
 			box.max.z-box.min.z
 		)/5;
 
-		let positions=Array.from(node.geometry.getAttribute("position").array);
-		let uvUnwrap=new UvUnwrap(positions);
-		let uvCoords=uvUnwrap.unwrap(texSize);
-		let uvArray=new Float32Array(uvCoords);
+		if (!node.userData.uvCoords) {
+			//console.log("computing uv for: "+node.name);
+			let positions=Array.from(node.geometry.getAttribute("position").array);
+			let uvUnwrap=new UvUnwrap(positions);
+			node.userData.uvCoords=uvUnwrap.unwrap(texSize);
+		}
+
+		//console.log("assigning uv for: "+node.name);
+		let uvArray=new Float32Array(node.userData.uvCoords);
 		let uvAttribute=new THREE.BufferAttribute(uvArray,2);
 		node.geometry.setAttribute("uv",uvAttribute);
-
-		node.userData.uvCalculated=true;
+		node.uvAssigned=true;
 	}
 
 	setHidden(hidden) {

@@ -70,3 +70,38 @@ export function threeNameNodes(node, index) {
 	for (let i=0; i<node.children.length; i++)
 		threeNameNodes(node.children[i],i);
 }
+
+export function threeNameMaterials(node) {
+	let uniqueMaterials=threeUniqueMaterials(node);
+	for (let i=0; i<uniqueMaterials.length; i++) {
+		if (!uniqueMaterials[i].name)
+			uniqueMaterials[i].name="Material "+(i+1);
+	}
+}
+
+export function threeExtractModelUserData(node) {
+	let resNode={
+		type: node.type,
+		userData: JSON.parse(JSON.stringify(node.userData)),
+		children: []
+	};
+
+	for (let child of node.children)
+		resNode.children.push(threeExtractModelUserData(child));
+
+	return resNode;
+}
+
+export function threeApplyModelUserData(node, nodeWithUserData) {
+	if (!node || !nodeWithUserData)
+		return;
+
+	if (node.type!=nodeWithUserData.type) {
+		console.log("starnge, different types...");
+		return;
+	}
+
+	node.userData=JSON.parse(JSON.stringify(nodeWithUserData.userData));
+	for (let i=0; i<node.children.length; i++)
+		threeApplyModelUserData(node.children[i],nodeWithUserData.children[i]);
+}
