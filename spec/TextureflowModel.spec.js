@@ -8,32 +8,19 @@ import {treeForEach} from "../src/utils/tree-util.js";
 globalThis.DOMParser=DOMParser;
 
 describe("TextureflowModel",()=>{
-	it("can process collada",async ()=>{
+	/*it("can process collada",async ()=>{
 		let data=fs.readFileSync("spec/data/house.dae","utf8");
 		let model=textureflowModelFromCollada(data);
 
-		console.log(model);
+		//console.log(model);
+	});*/
+
+	it("can process collada big file",async ()=>{
+		let data=fs.readFileSync("spec/data/Jungle.OS.noimg.dae","utf8");
+		let model=await textureflowModelFromCollada(data,{
+			onProgress: percent=>console.log("processing: "+percent)
+		});
+
+		//console.log(model);
 	});
-
-	/*it("can be imported",async ()=>{
-		let textureflowModel=new TextureflowModel();
-
-		let file=await getFileObject("spec/data/house.dae",{fs});
-		await textureflowModel.import(URL.createObjectURL(file),{});
-
-		//console.log(textureflowModel.getFacePaths("0/0"));
-	});*/
-
-	/*it("can be imported",async ()=>{
-		let textureflowModel=new TextureflowModel();
-
-		let file=await getFileObject("spec/data/Jungle.OS.noimg.dae",{fs});
-		await textureflowModel.import(URL.createObjectURL(file),{});
-
-		treeForEach(textureflowModel.model,(node,indexPath)=>{
-			console.log(indexPath.join("/")+": "+node.name);
-		})
-
-		//console.log("name: "+textureflowModel.model.name);
-	});*/
 });

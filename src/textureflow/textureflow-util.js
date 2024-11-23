@@ -1,7 +1,7 @@
 import {ColladaLoader} from 'three/addons/loaders/ColladaLoader.js';
 import {threeNameNodes, threeNameMaterials, threeCanonicalizeMultiMaterial} from "../utils/three-util.js";
 import * as THREE from 'three';
-import {treeForEach} from "../utils/tree-util.js";
+import {treeForEach, treeAllNodes} from "../utils/tree-util.js";
 import UvUnwrap from "../utils/UvUnwrap.js";
 
 function computeUvCoords(node, texSize) {
@@ -16,7 +16,11 @@ function computeUvCoords(node, texSize) {
 	node.geometry.setAttribute("uv",uvAttribute);
 }
 
-export function textureflowModelFromCollada(colladaText) {
+export async function textureflowModelFromCollada(colladaText, options={}) {
+	let onProgress=options.onProgress;
+	if (!onProgress)
+		onProgress=()=>{};
+
 	let loader=new ColladaLoader();
 	let modelData=loader.parse(colladaText);
 
@@ -34,10 +38,13 @@ export function textureflowModelFromCollada(colladaText) {
 		box.max.z-box.min.z
 	)/5;
 
-	treeForEach(model,node=>{
-		if (node.type=="Mesh")
-			computeUvCoords(node,texSize);
-	});
+	let nodes=treeAllNodes(model);
+	let meshNodes=nodes.filter(n=>n.type=="Mesh");
+	for (let i=0; i<meshNodes.length; i++) {
+		computeUvCoords(meshNodes[i],texSize);
+		onProgress(Math.round(100*i/meshNodes.length));
+		await new Promise(r=>setTimeout(r,0));
+	}
 
 	return model.toJSON();
 }
