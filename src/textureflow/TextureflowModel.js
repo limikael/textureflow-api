@@ -27,27 +27,14 @@ export class TextureflowModel extends EventTarget {
 		this.selectionMaterial.opacity=0.5;
 	}
 
-	async load(url, options={}) {
+	async parse(jsonData, options={}) {
 		this.setLoading(true);
 
-		/*if (options.initMaterialLibrary===undefined)
-			options.initMaterialLibrary=true;
-
-		if (options.initMaterialLibrary)
-			await this.materialLibrary.init();*/
-
-		let loader=new ColladaLoader();
-		let urlText=await (await fetch(url)).text();
-		//console.log(urlText);
-		let modelData=loader.parse(urlText);
-
-		this.model=modelData.scene;
+		let loader=new THREE.ObjectLoader();
+		this.model=loader.parse(jsonData);
 		this.box=new THREE.Box3();
 		this.box.expandByObject(this.model);
 
-		threeNameNodes(this.model);
-		threeNameMaterials(this.model);
-		threeCanonicalizeMultiMaterial(this.model);
 		threeApplyUserData(this.model,options.userData);
 
 		for (let facePath of this.getFacePaths()) {
@@ -283,7 +270,7 @@ export class TextureflowModel extends EventTarget {
 		let faceInfo=this.getFaceInfo(facePath);
 		let faceData=this.getFaceData(facePath);
 
-		this.updateUvCoords(node);
+		//this.updateUvCoords(node);
 
 		if (this.hidden.includes(facePath)) {
 			node.material[index]=this.invisibleMaterial;
@@ -302,7 +289,7 @@ export class TextureflowModel extends EventTarget {
 		}
 	}
 
-	updateUvCoords(node) {
+	/*updateUvCoords(node) {
 		let needUv=false;
 		for (let nodeFaceInfo of node.userData.faceInfo)
 			if (nodeFaceInfo && nodeFaceInfo.materialName)
@@ -341,7 +328,7 @@ export class TextureflowModel extends EventTarget {
 		let uvAttribute=new THREE.BufferAttribute(uvArray,2);
 		node.geometry.setAttribute("uv",uvAttribute);
 		node.uvAssigned=true;
-	}
+	}*/
 
 	setHidden(hidden) {
 		this.hidden=hidden;

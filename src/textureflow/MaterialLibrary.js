@@ -32,7 +32,9 @@ export class LibraryMaterial {
 export class MaterialLibrary extends EventTarget {
 	constructor() {
 		super();
-		this.baseUrl=window.location.origin;
+
+		if (globalThis.window)
+			this.baseUrl=globalThis.window.location.origin;
 
 		//this.baseUrl="http://localhost:3000/";
 		//this.baseUrl="https://textureflow.io/";
