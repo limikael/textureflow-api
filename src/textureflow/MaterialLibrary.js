@@ -2,14 +2,21 @@ import {createQqlClient} from "qql";
 import urlJoin from "url-join";
 import * as THREE from 'three';
 import {loaderPromise} from "../utils/three-util.js";
+import {ResolvablePromise} from "../utils/js-util.js";
 
 export class LibraryMaterial {
-	constructor(materialInfo, materialLibrary) {
-		this.materialInfo=materialInfo;
+	constructor(materialName, materialLibrary) {
+		this.materialName=materialName;
 		this.materialLibrary=materialLibrary;
+
+		this.load();
 	}
 
 	async load() {
+		await this.materialLibrary.init();
+
+		this.materialInfo=this.materialLibrary.materialInfoByName[this.materialName];
+
 		//await new Promise(r=>setTimeout(r,1000));
 
 		let url=urlJoin(this.materialLibrary.baseUrl,"/admin/_content",this.materialInfo.texture);
@@ -29,9 +36,16 @@ export class MaterialLibrary extends EventTarget {
 		super();
 		this.baseUrl="http://localhost:3000/";
 		//this.baseUrl="https://textureflow.io/";
+
+		this.libraryMaterials={};
 	}
 
 	async init() {
+		if (this.initPromise)
+			return await this.initPromise;
+
+		this.initPromise=new ResolvablePromise();
+
 		console.log("init material library");
 		let qql=createQqlClient(urlJoin(this.baseUrl,"admin/_qql"));
 		let materialInfos=await qql({
@@ -39,18 +53,15 @@ export class MaterialLibrary extends EventTarget {
 		});
 
 		this.materialInfoByName=Object.fromEntries(materialInfos.map(m=>[m.name,m]));
-		this.libraryMaterials={};
+		this.initPromise.resolve();
 	}
 
 	getMaterial(materialName) {
-		if (!this.materialInfoByName[materialName])
-			throw new Error("unknown material: "+materialName);
+		/*if (!this.materialInfoByName[materialName])
+			throw new Error("unknown material: "+materialName);*/
 
-		if (!this.libraryMaterials[materialName]) {
-			let m=new LibraryMaterial(this.materialInfoByName[materialName],this);
-			m.load();
-			this.libraryMaterials[materialName]=m;
-		}
+		if (!this.libraryMaterials[materialName])
+			this.libraryMaterials[materialName]=new LibraryMaterial(materialName,this);
 
 		return this.libraryMaterials[materialName];
 	}

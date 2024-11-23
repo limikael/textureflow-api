@@ -1,7 +1,7 @@
 import {ColladaLoader} from 'three/addons/loaders/ColladaLoader.js';
 import {loaderPromise, loaderParsePromise, threeUniqueMaterials, 
 	threeCanonicalizeMultiMaterial, threeNameNodes, 
-	threeExtractModelUserData, threeApplyModelUserData, threeNameMaterials} from "../utils/three-util.js";
+	threeExtractUserData, threeApplyUserData, threeNameMaterials} from "../utils/three-util.js";
 import * as THREE from 'three';
 import {treeForEach, treeNodeByIndexPath, treeSplitIndexPath, treeLeafIndexPaths, /*treePathBasename, treePathDirname*/} from "../utils/tree-util.js";
 import urlJoin from "url-join";
@@ -30,11 +30,11 @@ export class TextureflowModel extends EventTarget {
 	async load(url, options={}) {
 		this.setLoading(true);
 
-		if (options.initMaterialLibrary===undefined)
+		/*if (options.initMaterialLibrary===undefined)
 			options.initMaterialLibrary=true;
 
 		if (options.initMaterialLibrary)
-			await this.materialLibrary.init();
+			await this.materialLibrary.init();*/
 
 		let loader=new ColladaLoader();
 		let urlText=await (await fetch(url)).text();
@@ -48,7 +48,7 @@ export class TextureflowModel extends EventTarget {
 		threeNameNodes(this.model);
 		threeNameMaterials(this.model);
 		threeCanonicalizeMultiMaterial(this.model);
-		threeApplyModelUserData(this.model,options.userData);
+		threeApplyUserData(this.model,options.userData);
 
 		for (let facePath of this.getFacePaths()) {
 			this.initFaceInfo(facePath);
@@ -59,7 +59,7 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	getModelUserData() {
-		return threeExtractModelUserData(this.model);
+		return threeExtractUserData(this.model);
 	}
 
 	setLoading(loading) {

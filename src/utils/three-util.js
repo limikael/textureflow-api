@@ -79,7 +79,7 @@ export function threeNameMaterials(node) {
 	}
 }
 
-export function threeExtractModelUserData(node) {
+export function threeExtractUserData(node) {
 	let resNode={
 		type: node.type,
 		userData: JSON.parse(JSON.stringify(node.userData)),
@@ -87,12 +87,12 @@ export function threeExtractModelUserData(node) {
 	};
 
 	for (let child of node.children)
-		resNode.children.push(threeExtractModelUserData(child));
+		resNode.children.push(threeExtractUserData(child));
 
 	return resNode;
 }
 
-export function threeApplyModelUserData(node, nodeWithUserData) {
+export function threeApplyUserData(node, nodeWithUserData) {
 	if (!node || !nodeWithUserData)
 		return;
 
@@ -103,5 +103,5 @@ export function threeApplyModelUserData(node, nodeWithUserData) {
 
 	node.userData=JSON.parse(JSON.stringify(nodeWithUserData.userData));
 	for (let i=0; i<node.children.length; i++)
-		threeApplyModelUserData(node.children[i],nodeWithUserData.children[i]);
+		threeApplyUserData(node.children[i],nodeWithUserData.children[i]);
 }
