@@ -46,7 +46,18 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	getModelUserData() {
-		return threeExtractUserData(this.model);
+		let modelUserData=threeExtractUserData(this.model);
+		treeForEach(modelUserData,node=>{
+			if (node.userData.faceInfo) {
+				node.userData.faceInfo=node.userData.faceInfo.map(i=>({
+					materialName: i.materialName,
+					textureScale: i.textureScale,
+					textureRotation: i.textureRotation
+				}));
+			}
+		});
+
+		return modelUserData;
 	}
 
 	setLoading(loading) {
@@ -288,47 +299,6 @@ export class TextureflowModel extends EventTarget {
 			node.material[index]=faceData.colorMaterial;
 		}
 	}
-
-	/*updateUvCoords(node) {
-		let needUv=false;
-		for (let nodeFaceInfo of node.userData.faceInfo)
-			if (nodeFaceInfo && nodeFaceInfo.materialName)
-				needUv=true;
-
-		if (needUv && !node.uvAssigned) {
-			this.calculateUvCoords(node);
-		}
-
-		if (!needUv) {
-			delete node.userData.uvCoords;
-			node.uvAssigned=false;
-		}
-	}
-
-	calculateUvCoords(node) {
-		if (node.type!="Mesh")
-			throw new Error("Not a mesh!");
-
-		let box=this.getBox();
-		let texSize=Math.max(
-			box.max.x-box.min.x,
-			box.max.y-box.min.y,
-			box.max.z-box.min.z
-		)/5;
-
-		if (!node.userData.uvCoords) {
-			//console.log("computing uv for: "+node.name);
-			let positions=Array.from(node.geometry.getAttribute("position").array);
-			let uvUnwrap=new UvUnwrap(positions);
-			node.userData.uvCoords=uvUnwrap.unwrap(texSize);
-		}
-
-		//console.log("assigning uv for: "+node.name);
-		let uvArray=new Float32Array(node.userData.uvCoords);
-		let uvAttribute=new THREE.BufferAttribute(uvArray,2);
-		node.geometry.setAttribute("uv",uvAttribute);
-		node.uvAssigned=true;
-	}*/
 
 	setHidden(hidden) {
 		this.hidden=hidden;
