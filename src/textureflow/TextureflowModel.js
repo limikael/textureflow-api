@@ -82,7 +82,7 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	handleMaterialLoaded=(ev)=>{
-		console.log("handle material loaded: "+ev.materialName);
+		//console.log("handle material loaded: "+ev.materialName);
 
 		for (let facePath of this.getFacePaths()) {
 			let faceInfo=this.getFaceInfo(facePath);

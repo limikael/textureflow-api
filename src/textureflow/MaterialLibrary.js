@@ -17,10 +17,8 @@ export class LibraryMaterial {
 
 		this.materialInfo=this.materialLibrary.materialInfoByName[this.materialName];
 
-		//await new Promise(r=>setTimeout(r,1000));
-
 		let url=urlJoin(this.materialLibrary.baseUrl,"/admin/_content",this.materialInfo.texture);
-		console.log("loading material: "+this.materialInfo.name+" url="+url);
+		//console.log("loading material: "+this.materialInfo.name+" url="+url);
 
 		let imageLoader=new THREE.ImageLoader();
 		this.image=await loaderPromise(imageLoader,url);
@@ -34,7 +32,9 @@ export class LibraryMaterial {
 export class MaterialLibrary extends EventTarget {
 	constructor() {
 		super();
-		this.baseUrl="http://localhost:3000/";
+		this.baseUrl=window.location.origin;
+
+		//this.baseUrl="http://localhost:3000/";
 		//this.baseUrl="https://textureflow.io/";
 
 		this.libraryMaterials={};
@@ -46,7 +46,7 @@ export class MaterialLibrary extends EventTarget {
 
 		this.initPromise=new ResolvablePromise();
 
-		console.log("init material library");
+		//console.log("init material library");
 		let qql=createQqlClient(urlJoin(this.baseUrl,"admin/_qql"));
 		let materialInfos=await qql({
 			manyFrom: "materials"
@@ -57,9 +57,6 @@ export class MaterialLibrary extends EventTarget {
 	}
 
 	getMaterial(materialName) {
-		/*if (!this.materialInfoByName[materialName])
-			throw new Error("unknown material: "+materialName);*/
-
 		if (!this.libraryMaterials[materialName])
 			this.libraryMaterials[materialName]=new LibraryMaterial(materialName,this);
 
