@@ -27,7 +27,19 @@ export class TextureflowModel extends EventTarget {
 		this.selectionMaterial.opacity=0.5;
 	}
 
+	async load(options={}) {
+		console.log("loading... ",options);
+		this.setLoading(true);
+
+		let modelData=await (await fetch(options.url)).json();
+
+		await this.parse(modelData,options);
+	}
+
 	async parse(jsonData, options={}) {
+		if (options.materialLibraryBaseUrl)
+			this.materialLibrary.baseUrl=options.materialLibraryBaseUrl;
+
 		this.setLoading(true);
 
 		let loader=new THREE.ObjectLoader();
@@ -306,5 +318,21 @@ export class TextureflowModel extends EventTarget {
 			this.updateFace(facePath);
 
 		this.dispatchEvent(new Event("change"));
+	}
+
+	getExportData() {
+		let clonedModel=this.model.clone();
+		treeForEach(clonedModel,(node, indexPath)=>{
+			if (node.type=="Mesh") {
+				for (let i=0; i<node.userData.faceInfo.length; i++) {
+					let facePath=[...indexPath,i];
+					let faceData=this.getFaceData(facePath);
+					node.material[i]=faceData.colorMaterial;
+				}
+			}
+		});
+
+		let exportData=clonedModel.toJSON();
+		return exportData;
 	}
 }
