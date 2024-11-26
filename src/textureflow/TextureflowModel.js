@@ -40,6 +40,8 @@ export class TextureflowModel extends EventTarget {
 		if (options.materialLibraryBaseUrl)
 			this.materialLibrary.baseUrl=options.materialLibraryBaseUrl;
 
+		await this.materialLibrary.init();
+
 		this.setLoading(true);
 
 		let loader=new THREE.ObjectLoader();
@@ -201,7 +203,10 @@ export class TextureflowModel extends EventTarget {
 			throw new Error("No material!");
 
 		faceInfo.name="FaceGroup "+(materialIndex+1);
-		faceInfo.labels=[material.name];
+
+		if (!faceInfo.labels)
+			faceInfo.labels=[material.name];
+
 		faceInfo.color=material.color;
 		faceInfo.opacity=material.opacity;
 		if (faceInfo.opacity===undefined)
@@ -285,8 +290,6 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	updateFace(facePath) {
-		//console.log("update face: "+facePath);
-
 		this.updateFaceData(facePath);
 
 		let [node,index]=this.resolveFacePath(facePath);

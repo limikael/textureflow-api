@@ -48,7 +48,7 @@ export class MaterialLibrary extends EventTarget {
 
 		this.initPromise=new ResolvablePromise();
 
-		//console.log("init material library");
+		console.log("init material library");
 		let qql=createQqlClient(urlJoin(this.baseUrl,"admin/_qql"));
 		let materialInfos=await qql({
 			manyFrom: "materials"
@@ -56,6 +56,14 @@ export class MaterialLibrary extends EventTarget {
 
 		this.materialInfoByName=Object.fromEntries(materialInfos.map(m=>[m.name,m]));
 		this.initPromise.resolve();
+		console.log("material initialized");
+	}
+
+	getMaterialInfo(materialName) {
+		let info=this.materialInfoByName[materialName];
+
+		info.thumbUrl=urlJoin(this.baseUrl,"admin/_content",info.thumb);
+		return info;
 	}
 
 	getMaterial(materialName) {
