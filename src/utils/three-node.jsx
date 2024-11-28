@@ -1,11 +1,13 @@
 import * as THREE from 'three';
-import {useEffect, useRef, useLayoutEffect, useMemo, useContext, useState, createContext} from "react";
-import {useConstructor} from "../utils/react-util.jsx";
+import {useEffect, useRef, useLayoutEffect, useMemo, useContext, useState, createContext, useCallback} from "react";
+import {useConstructor, useResizeObserver} from "../utils/react-util.jsx";
+import {compareIntersectionArray} from "./three-util.js";
 
 let NodeParentContext=createContext();
 
 export function Scene({children, camera, class: className, nodeRef,
-		onIntersectionChange, onFrame, onDragOver, ...props}) {
+		onIntersectionChange, onFrame, onDragOver, 
+		animationLoop, ...props}) {
 	let domRef=useRef();
 	let sceneState=useConstructor(()=>({
 		scene: new THREE.Scene(),
@@ -47,48 +49,62 @@ export function Scene({children, camera, class: className, nodeRef,
 		}
 	}
 
+	let animate=useCallback(()=>{
+		//console.log("animate...");
+
+		if (onFrame)
+			onFrame();
+
+		sceneState.renderer.setClearColor(0x000000,0);
+
+		if (!camera)
+			camera=new THREE.PerspectiveCamera();
+
+		let el=domRef.current;
+		if (el.clientWidth<el.clientHeight)
+			camera.zoom=el.clientWidth/el.clientHeight;
+
+		camera.aspect=el.clientWidth/el.clientHeight;
+		camera.updateProjectionMatrix();
+		sceneState.renderer.setSize(el.clientWidth,el.clientHeight);
+
+		sceneState.raycaster.setFromCamera(sceneState.pointer,camera);
+		updateIntersection();
+
+		sceneState.renderer.render(sceneState.scene,camera);
+	},[]);
+
 	useLayoutEffect(()=>{
 		domRef.current.appendChild(sceneState.renderer.domElement);
-
 		if (!sceneState.nodeRefCalled && nodeRef) {
-			nodeRef(sceneState.scene,sceneState.renderer);
+			nodeRef(sceneState.scene,sceneState.renderer,animate);
 		}
 
-		function animate() {
-			//console.log("anim...");
-
-			if (onFrame)
-				onFrame();
-
-			sceneState.renderer.setClearColor(0x000000,0);
-
-			if (!camera)
-				camera=new THREE.PerspectiveCamera();
-
-			let el=domRef.current;
-			if (el.clientWidth<el.clientHeight)
-				camera.zoom=el.clientWidth/el.clientHeight;
-
-			camera.aspect=el.clientWidth/el.clientHeight;
-			camera.updateProjectionMatrix();
-			sceneState.renderer.setSize(el.clientWidth,el.clientHeight);
-
-			sceneState.raycaster.setFromCamera(sceneState.pointer,camera);
-			updateIntersection();
-
-			sceneState.renderer.render(sceneState.scene,camera);
-		}
-
-		sceneState.renderer.setAnimationLoop(animate);
+		//sceneState.renderer.setAnimationLoop(animate);
 
 		return (()=>{
 			domRef.current.removeChild(sceneState.renderer.domElement);
-			sceneState.renderer.setAnimationLoop(null);
 		});
 	},[]);
 
-/*				onClick={onClick} onMouseDown={onMouseDown} onContextMenu={onContextMenu}
-				onMouseUp={onMouseUp} onDrop={onDrop} tabIndex={0} onDragEnter={ev=>console.log("drag enter")}>*/
+	useLayoutEffect(()=>{
+		if (animationLoop)
+			sceneState.renderer.setAnimationLoop(animate);
+
+		return (()=>{
+			sceneState.renderer.setAnimationLoop(null);
+		});
+	},[animationLoop]);
+
+	useLayoutEffect(()=>{
+		if (!animationLoop)
+			animate();
+	});
+
+	useResizeObserver(domRef,()=>{
+		if (!animationLoop)
+			animate();
+	});
 
 	return (
 		<div ref={domRef} class={className} 

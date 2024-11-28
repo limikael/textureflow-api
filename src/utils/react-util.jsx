@@ -33,3 +33,13 @@ export function useForceUpdate() {
 
 	return forceUpdate;
 }
+
+export function useResizeObserver(ref, fn) {
+	useLayoutEffect(()=>{
+		let resizeObserver=new ResizeObserver(fn);
+		resizeObserver.observe(ref.current);
+		return (()=>{
+			resizeObserver.disconnect();
+		});
+	},[ref,ref.current]);
+}

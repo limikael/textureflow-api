@@ -28,7 +28,7 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	async load(options={}) {
-		console.log("loading... ",options);
+		//console.log("loading... ",options);
 		this.setLoading(true);
 
 		let modelData=await (await fetch(options.url)).json();
@@ -101,6 +101,8 @@ export class TextureflowModel extends EventTarget {
 			if (faceInfo.materialName==ev.materialName)
 				this.updateFace(facePath);
 		}
+
+		this.dispatchEvent(new Event("change"));
 	}
 
 	createSelectionClone(selectedFacePaths) {

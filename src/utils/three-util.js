@@ -12,7 +12,7 @@ export function loaderParsePromise(loader, data) {
 	});
 }
 
-function compareIntersectionObject(a, b) {
+export function compareIntersectionObject(a, b) {
 	return (
 		(a.distance==b.distance) &&
 		(a.point.equals(b.point)) &&
@@ -22,7 +22,7 @@ function compareIntersectionObject(a, b) {
 	);
 }
 
-function compareIntersectionArray(a, b) {
+export function compareIntersectionArray(a, b) {
 	if (a.length!=b.length)
 		return false;
 
