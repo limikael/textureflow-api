@@ -241,19 +241,6 @@ export class TextureflowModel extends EventTarget {
 		let faceData=this.getFaceData(facePath);
 		let faceInfo=this.getFaceInfo(facePath);
 
-		if (!faceData.textureMaterial) {
-			let texture=new THREE.Texture();
-			texture.wrapS=THREE.RepeatWrapping;
-			texture.wrapT=THREE.RepeatWrapping;
-			texture.repeat.set(1,1);
-
-			faceData.textureMaterial=new THREE.MeshStandardMaterial({
-				map: texture,
-				opacity: faceInfo.opacity,
-				transparent: faceInfo.opacity<=1-Number.EPSILON,
-			});
-		}
-
 		if (!faceData.colorMaterial)
 			faceData.colorMaterial=new THREE.MeshPhongMaterial({
 				color: faceInfo.color, 
@@ -264,31 +251,36 @@ export class TextureflowModel extends EventTarget {
 
 		if (faceInfo.materialName) {
 			let libraryMaterial=this.materialLibrary.getMaterial(faceInfo.materialName);
-			if (libraryMaterial.image && 
-					libraryMaterial.image!=faceData.textureMaterial.map.image) {
-				faceData.textureMaterial.map.image=libraryMaterial.image;
-				faceData.textureMaterial.map.needsUpdate=true;
+
+			if (!libraryMaterial.material) {
+				faceData.assignedMaterialName=null;
+				faceData.textureMaterial=null;
+			}
+
+			else if (faceData.assignedMaterialName!=faceInfo.materialName) {
+				faceData.textureMaterial=libraryMaterial.material.clone();
+				faceData.textureMaterial.map=faceData.textureMaterial.map.clone();
+				faceData.assignedMaterialName=faceInfo.materialName;
 			}
 		}
 
 		else {
-			if (faceData.textureMaterial.map.image) {
-				faceData.textureMaterial.map.image=null;
-				faceData.textureMaterial.map.needsUpdate=true;
-			}
+			faceData.assignedMaterialName=null;
+			faceData.textureMaterial=null;
 		}
 
 		let textureRotation=faceInfo.textureRotation;
 		if (!textureRotation)
 			textureRotation=0;
 
-		faceData.textureMaterial.map.rotation=2*Math.PI*textureRotation/360;
-
 		let textureScale=faceInfo.textureScale;
 		if (!textureScale)
 			textureScale=1;
 
-		faceData.textureMaterial.map.repeat.set(1/textureScale,1/textureScale);
+		if (faceData.textureMaterial) {
+			faceData.textureMaterial.map.rotation=2*Math.PI*textureRotation/360;
+			faceData.textureMaterial.map.repeat.set(1/textureScale,1/textureScale);
+		}
 	}
 
 	updateFace(facePath) {
@@ -298,14 +290,12 @@ export class TextureflowModel extends EventTarget {
 		let faceInfo=this.getFaceInfo(facePath);
 		let faceData=this.getFaceData(facePath);
 
-		//this.updateUvCoords(node);
-
 		if (this.hidden.includes(facePath)) {
 			node.material[index]=this.invisibleMaterial;
 		}
 
 		else if (faceInfo.materialName) {
-			if (faceData.textureMaterial.map.image)
+			if (faceData.textureMaterial)
 				node.material[index]=faceData.textureMaterial;
 
 			else

@@ -27,16 +27,6 @@ export function Scene({children, camera, class: className, nodeRef,
 		sceneState.pointer.set(x,y);
 	}
 
-	function handleMouseMove(ev) {
-		updatePointerFromMouseEvent(ev);
-	}
-
-	function handleDragOver(ev) {
-		updatePointerFromMouseEvent(ev);
-		if (onDragOver)
-			onDragOver(ev);
-	}
-
 	function updateIntersection() {
 		let intersection=sceneState.raycaster.intersectObject(sceneState.scene,true);
 
@@ -49,6 +39,21 @@ export function Scene({children, camera, class: className, nodeRef,
 		}
 	}
 
+	function handleMouseMove(ev) {
+		updatePointerFromMouseEvent(ev);
+		sceneState.raycaster.setFromCamera(sceneState.pointer,sceneState.camera);
+		updateIntersection();
+	}
+
+	function handleDragOver(ev) {
+		updatePointerFromMouseEvent(ev);
+		sceneState.raycaster.setFromCamera(sceneState.pointer,sceneState.camera);
+		updateIntersection();
+
+		if (onDragOver)
+			onDragOver(ev);
+	}
+
 	let animate=useCallback(()=>{
 		//console.log("animate...");
 
@@ -57,21 +62,24 @@ export function Scene({children, camera, class: className, nodeRef,
 
 		sceneState.renderer.setClearColor(0x000000,0);
 
-		if (!camera)
-			camera=new THREE.PerspectiveCamera();
+		if (camera)
+			sceneState.camera=camera;
+
+		if (!sceneState.camera)
+			sceneState.camera=new THREE.PerspectiveCamera();
 
 		let el=domRef.current;
 		if (el.clientWidth<el.clientHeight)
-			camera.zoom=el.clientWidth/el.clientHeight;
+			sceneState.camera.zoom=el.clientWidth/el.clientHeight;
 
-		camera.aspect=el.clientWidth/el.clientHeight;
-		camera.updateProjectionMatrix();
+		sceneState.camera.aspect=el.clientWidth/el.clientHeight;
+		sceneState.camera.updateProjectionMatrix();
 		sceneState.renderer.setSize(el.clientWidth,el.clientHeight);
 
-		sceneState.raycaster.setFromCamera(sceneState.pointer,camera);
+		sceneState.raycaster.setFromCamera(sceneState.pointer,sceneState.camera);
 		updateIntersection();
 
-		sceneState.renderer.render(sceneState.scene,camera);
+		sceneState.renderer.render(sceneState.scene,sceneState.camera);
 	},[]);
 
 	useLayoutEffect(()=>{
@@ -79,8 +87,6 @@ export function Scene({children, camera, class: className, nodeRef,
 		if (!sceneState.nodeRefCalled && nodeRef) {
 			nodeRef(sceneState.scene,sceneState.renderer,animate);
 		}
-
-		//sceneState.renderer.setAnimationLoop(animate);
 
 		return (()=>{
 			domRef.current.removeChild(sceneState.renderer.domElement);

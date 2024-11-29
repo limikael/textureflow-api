@@ -25,6 +25,19 @@ export class LibraryMaterial {
 
 		//console.log(this.image);
 
+
+		let texture=new THREE.Texture();
+		texture.wrapS=THREE.RepeatWrapping;
+		texture.wrapT=THREE.RepeatWrapping;
+		texture.repeat.set(1,1);
+		texture.image=this.image;
+		texture.needsUpdate=true;
+		this.texture=texture;
+
+		this.material=new THREE.MeshStandardMaterial({
+			map: this.texture,
+		});
+
 		this.materialLibrary.notifyMaterialLoaded(this.materialInfo.name);
 	}
 }
@@ -48,7 +61,7 @@ export class MaterialLibrary extends EventTarget {
 
 		this.initPromise=new ResolvablePromise();
 
-		console.log("init material library");
+		//console.log("init material library");
 		let qql=createQqlClient(urlJoin(this.baseUrl,"admin/_qql"));
 		let materialInfos=await qql({
 			manyFrom: "materials"
@@ -56,7 +69,7 @@ export class MaterialLibrary extends EventTarget {
 
 		this.materialInfoByName=Object.fromEntries(materialInfos.map(m=>[m.name,m]));
 		this.initPromise.resolve();
-		console.log("material initialized");
+		//console.log("material initialized");
 	}
 
 	getMaterialInfo(materialName) {
