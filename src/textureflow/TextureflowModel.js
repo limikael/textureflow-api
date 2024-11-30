@@ -8,13 +8,18 @@ import urlJoin from "url-join";
 import {MaterialLibrary} from "./MaterialLibrary.js";
 import {arrayUnique, arrayIncludesAll} from "../utils/js-util.js";
 import UvUnwrap from "../utils/UvUnwrap.js";
+import JSZip from "jszip";
 
 export class TextureflowModel extends EventTarget {
-	constructor() {
+	constructor(options={}) {
 		super();
 
 		this.materialLibrary=new MaterialLibrary();
 		this.materialLibrary.addEventListener("materialLoaded",this.handleMaterialLoaded);
+
+		if (options.materialLibraryBaseUrl)
+			this.materialLibrary.baseUrl=options.materialLibraryBaseUrl;
+
 		this.hidden=[];
 
 		this.loadingMaterial=new THREE.MeshBasicMaterial({color: 0x808080});
@@ -28,21 +33,40 @@ export class TextureflowModel extends EventTarget {
 	}
 
 	async load(options={}) {
+		if (this.loading)
+			throw new Error("Loading already in progress!");
+
 		//console.log("loading... ",options);
+		this.clear();
 		this.setLoading(true);
 
-		let modelData=await (await fetch(options.url)).json();
+		if (options.unzip) {
+			let response=await fetch(options.url);
+			let blob=await response.blob();
+			let zip=await JSZip.loadAsync(blob);
 
-		await this.parse(modelData,options);
+			let zipFile;
+			zip.forEach((_,f)=>zipFile=f);
+			console.log("Using unzipped file: "+zipFile.name);
+
+			let modelData=JSON.parse(await zipFile.async("string"));
+			await this.parse(modelData,options);
+		}
+
+		else {
+			let modelData=await (await fetch(options.url)).json();
+			await this.parse(modelData,options);
+		}
 	}
 
 	async parse(jsonData, options={}) {
+		this.clear();
+		this.setLoading(true);
+
 		if (options.materialLibraryBaseUrl)
 			this.materialLibrary.baseUrl=options.materialLibraryBaseUrl;
 
 		await this.materialLibrary.init();
-
-		this.setLoading(true);
 
 		let loader=new THREE.ObjectLoader();
 		this.model=loader.parse(jsonData);
@@ -56,7 +80,36 @@ export class TextureflowModel extends EventTarget {
 			this.updateFace(facePath);
 		}
 
+		this.createCenteredModel();
+
 		this.setLoading(false);
+	}
+
+	clear() {
+		this.model=null;
+		this.centeredModel=null;
+	}
+
+	createCenteredModel() {
+		let box=this.getBox();
+
+		let boxSize=new THREE.Vector3();
+		box.getSize(boxSize);
+
+		let boxCenter=new THREE.Vector3();
+		box.getCenter(boxCenter);
+
+		let positionGroup=new THREE.Group();
+		positionGroup.position.set(-boxCenter.x,-boxCenter.y + boxSize.y/2,-boxCenter.z);
+
+		let l=boxSize.length();
+		let scaleGroup=new THREE.Group();
+		scaleGroup.scale.set(1/l,1/l,1/l);
+
+		scaleGroup.add(positionGroup);
+		positionGroup.add(this.model);
+
+		this.centeredModel=scaleGroup;
 	}
 
 	getModelUserData() {

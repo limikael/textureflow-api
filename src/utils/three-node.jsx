@@ -132,7 +132,7 @@ export function Node({type, value, ctor, children, nodeRef, ...props}) {
 	if (!valueRef.current && type)
 		valueRef.current=new type();
 
-	if (value)
+	if (value!==undefined)
 		valueRef.current=value;
 
 	for (let k in props) {
